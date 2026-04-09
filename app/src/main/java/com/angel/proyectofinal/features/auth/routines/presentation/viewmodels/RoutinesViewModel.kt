@@ -18,59 +18,94 @@ class RoutinesViewModel @Inject constructor(
     private val routineDao: RoutineDao
 ) : ViewModel() {
 
-    // SharingStarted.WhileSubscribed(5000) permite que el flujo se mantenga vivo
-    // 5 segundos después de salir de la pantalla, ahorrando recursos.
     val routines = getRoutinesUseCase()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
-            // Verificamos si la base de datos está vacía para insertar datos de prueba
             val currentRoutines = routineDao.getAllRoutinesForCoach().first()
             if (currentRoutines.isEmpty()) {
+                // En tu RoutinesViewModel.kt, actualiza la parte de initialRoutines:
+
                 val initialRoutines = listOf(
                     RoutineEntity(
                         id = 1,
                         name = "Día de Pecho",
                         dayOfWeek = "Lunes",
                         objective = "Fuerza",
-                        description = "Press banca, flies, fondos",
+                        description = "Enfocado en press y aperturas",
                         exercises = "Banca: 3x12, Inclinado: 4x10",
                         status = "Pendiente",
-                        imageUrl = "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=500",
+                        imageUrl = "https://images.pexels.com/photos/416809/pexels-photo-416809.jpeg?auto=compress&cs=tinysrgb&w=500",
                         isVisible = true,
-                        isStepCounterActive = true, // NUEVO: Obligatorio
-                        restTime = 90               // NUEVO: Obligatorio
+                        isStepCounterActive = true,
+                        restTime = 90
                     ),
                     RoutineEntity(
                         id = 2,
                         name = "Día de Pierna",
                         dayOfWeek = "Martes",
                         objective = "Volumen",
-                        description = "Sentadillas, leg press, curl femoral",
+                        description = "Sentadillas y prensa",
                         exercises = "Sentadilla: 4x10, Prensa: 3x12",
                         status = "Pendiente",
-                        imageUrl = "https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=500",
+                        imageUrl = "https://images.pexels.com/photos/4761799/pexels-photo-4761799.jpeg?auto=compress&cs=tinysrgb&w=500",
                         isVisible = true,
-                        isStepCounterActive = true, // NUEVO
-                        restTime = 120              // NUEVO (Más descanso para pierna)
+                        isStepCounterActive = true,
+                        restTime = 120
                     ),
                     RoutineEntity(
                         id = 3,
                         name = "Día de Espalda",
                         dayOfWeek = "Miércoles",
                         objective = "Fuerza",
-                        description = "Dominadas, remo con barra, pullover",
+                        description = "Dominadas y remo",
                         exercises = "Dominadas: 3x12, Remo: 4x8",
                         status = "Pendiente",
-                        imageUrl = "https://images.unsplash.com/photo-1603287611837-517b1633598e?q=80&w=500",
+                        imageUrl = "https://images.pexels.com/photos/1954524/pexels-photo-1954524.jpeg?auto=compress&cs=tinysrgb&w=500",
                         isVisible = true,
-                        isStepCounterActive = false, // EJEMPLO: Desactivado para espalda
-                        restTime = 90                // NUEVO
+                        isStepCounterActive = false,
+                        restTime = 90
+                    ),
+                    // Puedes agregar más rutinas con estas imágenes:
+                    RoutineEntity(
+                        id = 4,
+                        name = "Día de Hombros",
+                        dayOfWeek = "Jueves",
+                        objective = "Definición",
+                        description = "Press militar y elevaciones",
+                        exercises = "Press Militar: 4x10, Elevaciones: 3x12",
+                        status = "Pendiente",
+                        imageUrl = "https://images.pexels.com/photos/416778/pexels-photo-416778.jpeg?auto=compress&cs=tinysrgb&w=500",
+                        isVisible = true,
+                        isStepCounterActive = true,
+                        restTime = 90
+                    ),
+                    RoutineEntity(
+                        id = 5,
+                        name = "Día de Brazos",
+                        dayOfWeek = "Viernes",
+                        objective = "Volumen",
+                        description = "Bíceps y tríceps",
+                        exercises = "Curl: 3x12, Tríceps: 4x10",
+                        status = "Pendiente",
+                        imageUrl = "https://images.pexels.com/photos/1825440/pexels-photo-1825440.jpeg?auto=compress&cs=tinysrgb&w=500",
+                        isVisible = true,
+                        isStepCounterActive = true,
+                        restTime = 90
+                    ),
+                    RoutineEntity(
+                        id = 6,
+                        name = "Cardio HIIT",
+                        dayOfWeek = "Sábado",
+                        objective = "Resistencia",
+                        description = "Entrenamiento cardiovascular",
+                        exercises = "Burpees: 4x15, Saltos: 3x20",
+                        status = "Pendiente",
+                        imageUrl = "https://images.pexels.com/photos/1954521/pexels-photo-1954521.jpeg?auto=compress&cs=tinysrgb&w=500",
+                        isVisible = true,
+                        isStepCounterActive = true,
+                        restTime = 60
                     )
                 )
                 initialRoutines.forEach { routineDao.insertRoutine(it) }

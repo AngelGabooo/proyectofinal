@@ -7,11 +7,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,16 @@ import com.angel.proyectofinal.features.coach.presentation.viewmodels.CoachViewM
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel = hiltViewModel()) {
+    // Colores GymStyle
+    val gymBlack = Color(0xFF000000)
+    val gymDarkGray = Color(0xFF0A0A0A)
+    val gymCardGray = Color(0xFF1C1C1E)
+    val gymBorderGray = Color(0xFF2C2C2E)
+    val gymWhite = Color(0xFFFFFFFF)
+    val gymLightGray = Color(0xFF8E8E93)
+    val gymAccent = Color(0xFFFF2D55)
+    val gymSuccess = Color(0xFF00E676)
+
     var name by remember { mutableStateOf("") }
     var day by remember { mutableStateOf("") }
     var objective by remember { mutableStateOf("") }
@@ -34,23 +45,46 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
 
     val exercises = remember { mutableStateListOf<String>() }
 
-    // Configuración de colores para todos los campos de texto
+    // Configuración de colores para campos de texto
     val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color.White,            // Letras blancas al escribir
-        unfocusedTextColor = Color.White,          // Letras blancas al terminar
-        focusedLabelColor = Color(0xFF00C853),     // Etiqueta verde al seleccionar
-        unfocusedLabelColor = Color.Gray,          // Etiqueta gris al estar inactivo
-        focusedBorderColor = Color(0xFF00C853),    // Borde verde neón
-        unfocusedBorderColor = Color.DarkGray,     // Borde gris oscuro
-        cursorColor = Color(0xFF00C853)            // Cursor verde
+        focusedTextColor = gymWhite,
+        unfocusedTextColor = gymWhite,
+        focusedLabelColor = gymAccent,
+        unfocusedLabelColor = gymLightGray,
+        focusedBorderColor = gymAccent,
+        unfocusedBorderColor = gymBorderGray,
+        cursorColor = gymAccent
     )
 
     Scaffold(
-        containerColor = Color(0xFF080808), // Negro profundo
+        containerColor = gymBlack,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("NUEVA RUTINA", fontWeight = FontWeight.Black, color = Color.White, letterSpacing = 1.sp) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color(0xFF121212))
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.FitnessCenter,
+                            contentDescription = null,
+                            tint = gymAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "NUEVA RUTINA",
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 2.sp,
+                            color = gymWhite,
+                            fontSize = 18.sp
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = gymDarkGray,
+                    scrolledContainerColor = gymBlack
+                )
             )
         }
     ) { padding ->
@@ -58,11 +92,18 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(20.dp),
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp), // ← padding para scroll
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text("DATOS BÁSICOS", color = Color(0xFF00C853), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "DATOS BÁSICOS",
+                    color = gymAccent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp
+                )
 
                 Spacer(Modifier.height(8.dp))
 
@@ -110,14 +151,21 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
                 )
 
                 Spacer(Modifier.height(16.dp))
-                Text("EJERCICIOS", color = Color(0xFF00C853), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+
+                Text(
+                    "EJERCICIOS",
+                    color = gymAccent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp
+                )
             }
 
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                    colors = CardDefaults.cardColors(containerColor = gymCardGray),
                     shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.DarkGray)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, gymBorderGray)
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         OutlinedTextField(
@@ -130,7 +178,10 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
 
                         Spacer(Modifier.height(8.dp))
 
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             OutlinedTextField(
                                 value = exSets,
                                 onValueChange = { exSets = it },
@@ -151,20 +202,25 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
 
                         Button(
                             onClick = {
-                                if(exName.isNotBlank()){
-                                    exercises.add("$exName: $exSets x $exReps")
-                                    exName = ""; exSets = ""; exReps = ""
+                                if (exName.isNotBlank()) {
+                                    exercises.add("${exName.uppercase()}: ${exSets}x${exReps}")
+                                    exName = ""
+                                    exSets = ""
+                                    exReps = ""
                                 }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
-                            shape = RoundedCornerShape(8.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = gymAccent,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Añadir Ejercicio", color = Color.White)
+                            Text("AÑADIR EJERCICIO", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -172,24 +228,26 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
 
             items(exercises) { ex ->
                 Surface(
-                    color = Color(0xFF1A1A1A),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    color = gymCardGray,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, gymBorderGray)
                 ) {
                     Text(
                         "✓ $ex",
-                        color = Color.White,
-                        modifier = Modifier.padding(12.dp),
-                        fontSize = 14.sp
+                        color = gymSuccess,
+                        modifier = Modifier.padding(14.dp),
+                        fontSize = 13.sp
                     )
                 }
             }
 
             item {
                 Spacer(Modifier.height(24.dp))
+
                 Button(
                     onClick = {
-                        if(name.isNotBlank() && exercises.isNotEmpty()) {
+                        if (name.isNotBlank() && exercises.isNotEmpty()) {
                             viewModel.saveRoutine(name, day, objective, exercises, restTime)
                             navController.navigate("coach_manage") {
                                 popUpTo("coach_home") { inclusive = false }
@@ -199,10 +257,18 @@ fun CreateRoutineScreen(navController: NavController, viewModel: CoachViewModel 
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = gymSuccess,
+                        contentColor = Color.Black
+                    )
                 ) {
-                    Text("GUARDAR RUTINA", color = Color.Black, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Text(
+                        "GUARDAR RUTINA",
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }

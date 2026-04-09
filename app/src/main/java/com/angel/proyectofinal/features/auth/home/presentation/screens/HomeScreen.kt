@@ -3,8 +3,10 @@ package com.angel.proyectofinal.features.home.presentation.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -67,10 +69,14 @@ fun HomeScreen(navController: NavController) {
             )
         }
     ) { padding ->
+        // Scroll state para poder hacer scroll vertical
+        val scrollState = rememberScrollState()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(scrollState) // AÑADIDO: Esto permite hacer scroll
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Top
         ) {
@@ -255,6 +261,9 @@ fun HomeScreen(navController: NavController) {
                     textAlign = TextAlign.Center
                 )
             }
+
+            // Espacio extra al final para mejor experiencia de scroll
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

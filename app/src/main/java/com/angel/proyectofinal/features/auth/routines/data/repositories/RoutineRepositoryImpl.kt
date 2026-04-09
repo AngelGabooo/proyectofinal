@@ -20,13 +20,13 @@ class RoutineRepositoryImpl @Inject constructor(
             list.map { entity ->
                 Routine(
                     id = entity.id,
-                    name = entity.name ?: "Rutina sin nombre",
-                    dayOfWeek = entity.dayOfWeek ?: "S/D",
-                    objective = entity.objective ?: "General",
+                    name = entity.name ?: "Sin nombre",
+                    dayOfWeek = entity.dayOfWeek ?: "",
+                    objective = entity.objective ?: "",
                     description = entity.description ?: "",
                     exercises = entity.exercises ?: "",
                     status = entity.status ?: "Pendiente",
-                    imageUrl = entity.imageUrl ?: "",
+                    imageUrl = entity.imageUrl ?: "", // Aseguramos que no sea nulo
                     isVisible = entity.isVisible,
                     isStepCounterActive = entity.isStepCounterActive,
                     restTime = entity.restTime

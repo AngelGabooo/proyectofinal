@@ -1,15 +1,21 @@
 package com.angel.proyectofinal.features.routines.presentation.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.Black
-import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -18,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.angel.proyectofinal.core.utils.HardwareHelper
 import com.angel.proyectofinal.features.routines.presentation.viewmodels.RoutinesViewModel
 import com.angel.proyectofinal.features.routines.presentation.viewmodels.WorkoutViewModel
@@ -31,25 +38,32 @@ fun WorkoutScreen(
     workoutViewModel: WorkoutViewModel = hiltViewModel(),
     routinesViewModel: RoutinesViewModel = hiltViewModel()
 ) {
+    // Colores GymStyle
+    val gymBlack = Color(0xFF000000)
+    val gymDarkGray = Color(0xFF0A0A0A)
+    val gymCardGray = Color(0xFF1C1C1E)
+    val gymBorderGray = Color(0xFF2C2C2E)
+    val gymWhite = Color(0xFFFFFFFF)
+    val gymLightGray = Color(0xFF8E8E93)
+    val gymAccent = Color(0xFFFF2D55)
+    val gymSuccess = Color(0xFF00E676)
+    val gymWarning = Color(0xFFFFB300)
+
     val context = LocalContext.current
     val hardware = remember { HardwareHelper(context) }
-
-    // Obtenemos las rutinas para buscar la actual
     val routines by routinesViewModel.routines.collectAsState()
-    val currentRoutine = remember(routines) { routines.find { it.id == routineId } }
 
-    // MODIFICACIÓN: El tiempo inicial ahora depende de lo que el Coach configuró
+    val currentRoutine = remember(routines, routineId) {
+        routines.find { it.id == routineId }
+    }
+
     var timeLeft by remember(currentRoutine) {
         mutableIntStateOf(currentRoutine?.restTime ?: 90)
     }
-
     var isRunning by remember { mutableStateOf(false) }
     val steps by hardware.stepCountFlow.collectAsState()
 
-    LaunchedEffect(Unit) {
-        hardware.startStepCounter()
-    }
-
+    LaunchedEffect(Unit) { hardware.startStepCounter() }
     DisposableEffect(Unit) {
         onDispose {
             hardware.stopStepCounter()
@@ -71,138 +85,325 @@ fun WorkoutScreen(
     }
 
     Scaffold(
-        containerColor = Color(0xFF0F0F0F),
+        containerColor = gymBlack,
         topBar = {
-            TopAppBar(
-                title = { Text("GUÍA DE RUTINA", fontWeight = FontWeight.Black, color = White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
+            CenterAlignedTopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.FitnessCenter,
+                            contentDescription = null,
+                            tint = gymAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "MODO ENTRENAMIENTO",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = gymWhite,
+                            fontSize = 14.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = gymDarkGray,
+                    scrolledContainerColor = gymBlack
+                )
             )
         }
     ) { padding ->
+        // Scroll state para poder hacer scroll si es necesario
+        val scrollState = rememberScrollState()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .verticalScroll(scrollState) // AÑADIDO: Scroll vertical
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- SECCIÓN DE LA IMAGEN ---
+            // Imagen de la rutina (más compacta)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp),
+                    .height(200.dp),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+                colors = CardDefaults.cardColors(containerColor = gymCardGray),
+                border = BorderStroke(1.dp, gymBorderGray)
             ) {
-                if (currentRoutine?.imageUrl != null) {
-                    AsyncImage(
-                        model = currentRoutine.imageUrl,
-                        contentDescription = "Ejemplo de ejercicio",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF00C853))
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (!currentRoutine?.imageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(currentRoutine?.imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Imagen Ejercicio",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                    )
+                                )
+                        )
+                        Text(
+                            text = currentRoutine?.name?.uppercase() ?: "",
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp),
+                            color = gymWhite,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.FitnessCenter,
+                                    contentDescription = null,
+                                    tint = gymBorderGray,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "SIN IMAGEN",
+                                    color = gymLightGray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // --- CRONÓMETRO ---
-            Card(
+            // Timer más compacto
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(32.dp)
+                color = gymCardGray,
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, gymBorderGray)
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("DESCANSO RESTANTE", color = Color(0xFF00C853), fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = gymAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "TIEMPO DE DESCANSO",
+                            color = gymAccent,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp,
+                            fontSize = 10.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Text(
                         text = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60),
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 72.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            fontSize = 56.sp,
+                            letterSpacing = 2.sp
                         ),
-                        color = if (timeLeft < 10) Color(0xFFFF5252) else White
+                        color = when {
+                            timeLeft < 10 -> gymWarning
+                            timeLeft < 30 -> gymAccent
+                            else -> gymWhite
+                        }
                     )
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // --- SECCIÓN INFORMATIVA (Pasos y Sensado) ---
+            // Data boxes más compactos (pasos y estado)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // MODIFICACIÓN: Solo mostramos la Card de pasos si el Coach lo activó
                 if (currentRoutine?.isStepCounterActive == true) {
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("PASOS", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                            Text("$steps", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = White)
-                        }
-                    }
+                    DataBox(
+                        label = "PASOS",
+                        value = "$steps",
+                        icon = Icons.Default.DirectionsRun,
+                        color = gymAccent,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("SENSADO", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                        Text("ON", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = Color(0xFF00C853))
-                    }
-                }
+                DataBox(
+                    label = "ESTADO",
+                    value = "LIVE",
+                    icon = Icons.Default.FiberManualRecord,
+                    color = gymSuccess,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // --- BOTONES DE CONTROL ---
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = {
-                        if (isRunning) isRunning = false
-                        else {
-                            hardware.stopAlarm()
-                            isRunning = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(60.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isRunning) Color(0xFF444444) else Color(0xFF00C853)
-                    )
-                ) {
-                    Text(
-                        if (isRunning) "PAUSAR" else "INICIAR DESCANSO",
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isRunning) White else Black
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
+            // Botones más compactos y optimizados
+            Button(
+                onClick = {
+                    if (isRunning) isRunning = false
+                    else {
                         hardware.stopAlarm()
-                        navController.popBackStack()
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, Color(0xFFFF5252)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                        isRunning = true
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp), // Altura reducida
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRunning) gymBorderGray else gymAccent,
+                    contentColor = if (isRunning) gymLightGray else Color.Black
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 2.dp
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text("FINALIZAR", fontWeight = FontWeight.Bold)
+                    Icon(
+                        if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        if (isRunning) "PAUSAR DESCANSO" else "INICIAR DESCANSO",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.5.sp
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Botón finalizar más compacto
+            OutlinedButton(
+                onClick = {
+                    hardware.stopAlarm()
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = gymWarning
+                ),
+                border = BorderStroke(1.dp, gymWarning.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "FINALIZAR RUTINA",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Frase motivacional pequeña
+            Text(
+                text = "💪 " + when {
+                    isRunning && timeLeft > 0 -> "DESCANSA Y RECUPERA"
+                    !isRunning && timeLeft > 0 -> "PREPARADO PARA CONTINUAR"
+                    timeLeft == 0 -> "¡DESCANSO COMPLETADO!"
+                    else -> "TÚ PUEDES, NO TE RINDAS"
+                } + " 💪",
+                color = gymLightGray.copy(alpha = 0.6f),
+                fontSize = 9.sp,
+                letterSpacing = 0.5.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun DataBox(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xFF121212),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF252525))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                label,
+                color = Color.Gray,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.5.sp
+            )
+            Text(
+                value,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 18.sp,
+                letterSpacing = 0.5.sp
+            )
         }
     }
 }
