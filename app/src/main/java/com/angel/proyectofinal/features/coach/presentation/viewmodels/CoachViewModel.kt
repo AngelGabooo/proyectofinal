@@ -4,8 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.angel.proyectofinal.features.routines.data.datasources.local.dao.RoutineDao
 import com.angel.proyectofinal.features.routines.data.datasources.local.entities.RoutineEntity
+import com.google.firebase.firestore.FirebaseFirestore // NUEVO
+import com.google.firebase.firestore.Query // NUEVO
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow // NUEVO
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow // NUEVO
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -15,17 +19,17 @@ class CoachViewModel @Inject constructor(
     private val routineDao: RoutineDao
 ) : ViewModel() {
 
+    // --- TUS FUNCIONES ORIGINALES DE GESTIÓN DE RUTINAS (INTACTAS) ---
+
     val allRoutines = routineDao.getAllRoutinesForCoach()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun saveRoutine(name: String, day: String, objective: String, exercises: List<String>, restTime: String) {
         viewModelScope.launch {
             try {
-                // Protección contra errores de escritura: convertimos a Int con seguridad
                 val time = restTime.trim().toIntOrNull() ?: 90
-
                 val entity = RoutineEntity(
-                    id = 0, // 0 asegura que Room genere un nuevo ID (Auto-increment)
+                    id = 0,
                     name = name,
                     dayOfWeek = day,
                     objective = objective,
@@ -38,7 +42,7 @@ class CoachViewModel @Inject constructor(
                 )
                 routineDao.insertRoutine(entity)
             } catch (e: Exception) {
-                e.printStackTrace() // Esto evita que el crash cierre la app y lo imprime en Logcat
+                e.printStackTrace()
             }
         }
     }
@@ -57,5 +61,45 @@ class CoachViewModel @Inject constructor(
         viewModelScope.launch {
             routineDao.updateRoutine(routine.copy(isStepCounterActive = !routine.isStepCounterActive))
         }
+    }
+    // Agrega esta función al final de tu CoachViewModel.kt
+    fun deleteStudentProgress(timestamp: Long) {
+        viewModelScope.launch {
+            firestore.collection("alumnos_progreso")
+                .whereEqualTo("timestamp", timestamp)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    for (document in snapshot.documents) {
+                        document.reference.delete()
+                    }
+                }
+        }
+    }
+    // --- NUEVA SECCIÓN: LECTURA DE AVANCES DE ALUMNOS DESDE FIRESTORE ---
+
+    private val firestore = FirebaseFirestore.getInstance()
+    private val _studentsProgress = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    val studentsProgress = _studentsProgress.asStateFlow()
+
+    init {
+        // Al iniciar el ViewModel, empezamos a escuchar los avances en la nube
+        fetchStudentsProgress()
+    }
+
+    private fun fetchStudentsProgress() {
+        firestore.collection("alumnos_progreso")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    e.printStackTrace()
+                    return@addSnapshotListener
+                }
+
+                val progressList = snapshot?.documents?.map { doc ->
+                    doc.data ?: emptyMap()
+                } ?: emptyList()
+
+                _studentsProgress.value = progressList
+            }
     }
 }

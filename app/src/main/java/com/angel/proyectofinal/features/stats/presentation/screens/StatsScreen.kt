@@ -5,10 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState // Importante
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll // Importante
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,18 +42,22 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
     val gymAccent = Color(0xFFFF2D55)
     val gymSuccess = Color(0xFF00E676)
 
-    // Datos de ejemplo
-    val daysAttended = 18
+    // --- OBTENCIÓN DE DATOS REALES ---
+    val daysAttended by viewModel.totalWorkouts.collectAsState()
+
+    // Configuración de objetivos
     val totalDays = 30
-    val routinesCompleted = 11
     val totalRoutines = 15
-    val totalMinutes = 1240
-    val caloriesBurned = 3850
 
-    val attendancePercentage = (daysAttended * 100 / totalDays)
-    val routinesPercentage = (routinesCompleted * 100 / totalRoutines)
+    // Cálculos basados en Room
+    val attendancePercentage = if (totalDays > 0) (daysAttended * 100 / totalDays).coerceAtMost(100) else 0
+    val routinesCompleted = daysAttended
+    val routinesPercentage = if (totalRoutines > 0) (routinesCompleted * 100 / totalRoutines).coerceAtMost(100) else 0
 
-    // Estado del Scroll
+    // Métricas estimadas
+    val totalMinutes = daysAttended * 45
+    val caloriesBurned = daysAttended * 350
+
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -83,6 +87,16 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
                         )
                     }
                 },
+                // BOTÓN DE REGRESO AÑADIDO AQUÍ
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Regresar",
+                            tint = gymWhite
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = gymDarkGray,
                     scrolledContainerColor = gymBlack
@@ -94,7 +108,6 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                // HABILITAMOS EL SCROLL AQUÍ
                 .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -122,8 +135,8 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("TU PROGRESO", color = gymLightGray, fontSize = 11.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
-                        Text("¡Vas por buen camino!", color = gymWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("TU PROGRESO REAL", color = gymLightGray, fontSize = 11.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                        Text(if(daysAttended > 0) "¡Gran trabajo hoy!" else "¡Inicia tu racha!", color = gymWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("${attendancePercentage}%", color = gymAccent, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
@@ -144,11 +157,11 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
                     }
                     Spacer(Modifier.height(20.dp))
                     CircularProgress(
-                        progress = daysAttended.toFloat() / totalDays,
+                        progress = if (totalDays > 0) daysAttended.toFloat() / totalDays else 0f,
                         text = "$attendancePercentage%",
                         subtitle = "ASISTENCIA",
                         color = gymAccent,
-                        secondaryText = "$daysAttended de $totalDays días"
+                        secondaryText = "$daysAttended de $totalDays días completados"
                     )
                 }
             }
@@ -174,14 +187,14 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         KPICard("CALORÍAS", formatNumber(caloriesBurned), calculatePercentage(caloriesBurned, 5000), Icons.Default.Whatshot, Color(0xFFFFB300))
-                        KPICard("RACHA", "7", 70, Icons.Default.FlashOn, gymSuccess)
+                        KPICard("RACHA", "$daysAttended", 100, Icons.Default.FlashOn, gymSuccess)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // BOTÓN DE VOLVER
+            // BOTÓN DE VOLVER (Se mantiene diseño original)
             Button(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -194,13 +207,12 @@ fun StatsScreen(navController: NavController, viewModel: StatsViewModel = hiltVi
                 Text("VOLVER AL PANEL", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
-            // Espacio extra al final para que el scroll no quede pegado al borde
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
-// --- RESTO DE COMPONENTES SE MANTIENEN IGUAL ---
+// --- COMPONENTES AUXILIARES ---
 
 @Composable
 fun KPICard(title: String, value: String, percentage: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier = Modifier) {

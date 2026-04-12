@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,11 +23,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.angel.proyectofinal.features.home.presentation.viewmodels.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltViewModel()) {
 
     // Colores GymStyle
     val gymBlack = Color(0xFF000000)
@@ -34,7 +38,15 @@ fun HomeScreen(navController: NavController) {
     val gymBorderGray = Color(0xFF2C2C2E)
     val gymWhite = Color(0xFFFFFFFF)
     val gymLightGray = Color(0xFF8E8E93)
-    val gymAccent = Color(0xFFFF2D55) // Rojo neón vibrante
+    val gymAccent = Color(0xFFFF2D55)
+
+    // --- DATOS REALES ---
+    val completedDays by viewModel.completedWorkouts.collectAsState()
+    val userName = viewModel.userName // OBTENEMOS EL NOMBRE DINÁMICO
+
+    val weeklyGoal = 5
+    val progress = if (weeklyGoal > 0) completedDays.toFloat() / weeklyGoal else 0f
+    val remainingDays = if (weeklyGoal - completedDays > 0) weeklyGoal - completedDays else 0
 
     Scaffold(
         containerColor = gymBlack,
@@ -69,20 +81,19 @@ fun HomeScreen(navController: NavController) {
             )
         }
     ) { padding ->
-        // Scroll state para poder hacer scroll vertical
         val scrollState = rememberScrollState()
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(scrollState) // AÑADIDO: Esto permite hacer scroll
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Top
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Header con gradiente y saludo mejorado
+            // Header con saludo DINÁMICO
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -101,7 +112,7 @@ fun HomeScreen(navController: NavController) {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "¡HOLA, ANGEL! 👋",
+                                text = "¡HOLA, ${userName.uppercase()}! 👋", // CAMBIADO A DINÁMICO
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = gymWhite,
                                 fontWeight = FontWeight.Bold,
@@ -124,7 +135,6 @@ fun HomeScreen(navController: NavController) {
                             )
                         }
 
-                        // Avatar circular decorativo
                         Surface(
                             modifier = Modifier.size(60.dp),
                             shape = CircleShape,
@@ -146,7 +156,6 @@ fun HomeScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Sección de título
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -169,7 +178,6 @@ fun HomeScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Barra de progreso motivacional
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -189,15 +197,16 @@ fun HomeScreen(navController: NavController) {
                             letterSpacing = 0.8.sp
                         )
                         Text(
-                            text = "3/5 días",
+                            text = "$completedDays/$weeklyGoal días",
                             color = gymAccent,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+
                     LinearProgressIndicator(
-                        progress = 0.6f,
+                        progress = progress.coerceIn(0f, 1f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
@@ -207,7 +216,9 @@ fun HomeScreen(navController: NavController) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "¡A 2 días de lograr tu meta semanal! 💪",
+                        text = if (remainingDays > 0)
+                            "¡A $remainingDays días de lograr tu meta semanal! 💪"
+                        else "¡META SEMANAL CUMPLIDA! 🏆",
                         color = gymLightGray.copy(alpha = 0.7f),
                         fontSize = 10.sp
                     )
@@ -216,7 +227,6 @@ fun HomeScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Grid de tarjetas de entrenamiento mejoradas
             MenuCard(
                 title = "MIS RUTINAS",
                 subtitle = "Explora tus entrenamientos",
@@ -231,7 +241,7 @@ fun HomeScreen(navController: NavController) {
                 subtitle = "Analiza tu progreso",
                 description = "Gráficos y métricas de rendimiento",
                 icon = Icons.Default.BarChart,
-                accentColor = Color(0xFF00D4FF), // Azul eléctrico
+                accentColor = Color(0xFF00D4FF),
                 onClick = { navController.navigate("stats") }
             )
 
@@ -240,13 +250,12 @@ fun HomeScreen(navController: NavController) {
                 subtitle = "Cuenta y Suscripción",
                 description = "Gestiona tu información personal",
                 icon = Icons.Default.Person,
-                accentColor = Color(0xFFFFD700), // Amarillo dorado
+                accentColor = Color(0xFFFFD700),
                 onClick = { navController.navigate("profile") }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Frase motivacional al final
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -262,7 +271,6 @@ fun HomeScreen(navController: NavController) {
                 )
             }
 
-            // Espacio extra al final para mejor experiencia de scroll
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -277,7 +285,6 @@ fun MenuCard(
     accentColor: Color,
     onClick: () -> Unit
 ) {
-    // Colores GymStyle
     val gymCardGray = Color(0xFF1C1C1E)
     val gymBorderGray = Color(0xFF2C2C2E)
     val gymWhite = Color(0xFFFFFFFF)
@@ -290,7 +297,6 @@ fun MenuCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = gymCardGray),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, gymBorderGray)
     ) {
         Row(
@@ -299,7 +305,6 @@ fun MenuCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icono con fondo circular
             Surface(
                 modifier = Modifier.size(56.dp),
                 shape = CircleShape,
@@ -342,7 +347,6 @@ fun MenuCard(
                 )
             }
 
-            // Icono de flecha indicadora
             Icon(
                 Icons.Default.ArrowForward,
                 contentDescription = "Ir",
@@ -353,7 +357,6 @@ fun MenuCard(
     }
 }
 
-// Funciones auxiliares para la fecha
 fun getCurrentDay(): String {
     val days = listOf("DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO")
     val calendar = java.util.Calendar.getInstance()

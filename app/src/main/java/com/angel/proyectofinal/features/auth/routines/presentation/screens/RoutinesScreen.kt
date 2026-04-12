@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -22,9 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +48,9 @@ fun RoutinesScreen(navController: NavController, viewModel: RoutinesViewModel = 
 
     val routines by viewModel.routines.collectAsState(initial = emptyList())
 
+    // Soporte para vibración en botones
+    val haptic = LocalHapticFeedback.current
+
     Scaffold(
         containerColor = gymBlack,
         topBar = {
@@ -57,12 +60,7 @@ fun RoutinesScreen(navController: NavController, viewModel: RoutinesViewModel = 
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            Icons.Default.FitnessCenter,
-                            null,
-                            tint = gymAccent,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Icon(Icons.Default.FitnessCenter, null, tint = gymAccent, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "MIS RUTINAS",
@@ -70,6 +68,16 @@ fun RoutinesScreen(navController: NavController, viewModel: RoutinesViewModel = 
                             letterSpacing = 2.sp,
                             color = gymWhite,
                             fontSize = 18.sp
+                        )
+                    }
+                },
+                // AÑADIMOS EL BOTÓN DE REGRESO AQUÍ
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Regresar",
+                            tint = gymWhite
                         )
                     }
                 },
@@ -109,7 +117,11 @@ fun RoutinesScreen(navController: NavController, viewModel: RoutinesViewModel = 
                     RoutineCard(
                         routine = routine,
                         accentColor = gymAccent,
-                        onClick = { navController.navigate("workout/${routine.id}") }
+                        onClick = {
+                            // ACCESIBILIDAD: Vibración al tocar la rutina
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            navController.navigate("workout/${routine.id}")
+                        }
                     )
                 }
                 item {
@@ -137,7 +149,6 @@ fun RoutineCard(routine: Routine, accentColor: Color, onClick: () -> Unit) {
     val gymSuccess = Color(0xFF00E676)
     val gymWarning = Color(0xFFFFB300)
 
-    // CORRECCIÓN: Forma correcta de detectar presión para animación de escala
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -159,7 +170,7 @@ fun RoutineCard(routine: Routine, accentColor: Color, onClick: () -> Unit) {
             .scale(scale)
             .clickable(
                 interactionSource = interactionSource,
-                indication = LocalIndication.current, // Mantiene el ripple visual
+                indication = LocalIndication.current,
                 onClick = onClick
             ),
         shape = RoundedCornerShape(20.dp),

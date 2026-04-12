@@ -50,6 +50,16 @@ fun CoachManageRoutinesScreen(navController: NavController, viewModel: CoachView
                         Text("CENTRO DE MANDO", fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp, color = gymWhite, fontSize = 16.sp)
                     }
                 },
+                // BOTÓN DE REGRESO AÑADIDO
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Regresar",
+                            tint = gymWhite
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = gymDarkGray)
             )
         },

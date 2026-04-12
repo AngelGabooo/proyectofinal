@@ -1,5 +1,10 @@
 package com.angel.proyectofinal.features.routines.presentation.screens
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,15 +21,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.angel.proyectofinal.core.services.TimerService
 import com.angel.proyectofinal.core.utils.HardwareHelper
 import com.angel.proyectofinal.features.routines.presentation.viewmodels.RoutinesViewModel
 import com.angel.proyectofinal.features.routines.presentation.viewmodels.WorkoutViewModel
@@ -53,17 +61,58 @@ fun WorkoutScreen(
     val hardware = remember { HardwareHelper(context) }
     val routines by routinesViewModel.routines.collectAsState()
 
+    // --- NUEVO: ESTADO PARA MANEJO DE RED (SNACKBAR) ---
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Escuchar eventos de sincronización desde el ViewModel
+    LaunchedEffect(Unit) {
+        workoutViewModel.uiEvent.collect { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    var completedSets by remember { mutableIntStateOf(0) }
+
+    var timerService by remember { mutableStateOf<TimerService?>(null) }
+    val connection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as TimerService.TimerBinder
+                timerService = binder.getService()
+            }
+            override fun onServiceDisconnected(name: ComponentName?) {
+                timerService = null
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val intent = Intent(context, TimerService::class.java)
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        onDispose { context.unbindService(connection) }
+    }
+
     val currentRoutine = remember(routines, routineId) {
         routines.find { it.id == routineId }
     }
 
-    var timeLeft by remember(currentRoutine) {
+    val timeLeft by timerService?.timeLeft?.collectAsState() ?: remember(currentRoutine) {
         mutableIntStateOf(currentRoutine?.restTime ?: 90)
     }
-    var isRunning by remember { mutableStateOf(false) }
+    val isRunning by timerService?.isRunning?.collectAsState() ?: remember { mutableStateOf(false) }
     val steps by hardware.stepCountFlow.collectAsState()
 
     LaunchedEffect(Unit) { hardware.startStepCounter() }
+
+    LaunchedEffect(timeLeft) {
+        if (timeLeft == 0 && isRunning) {
+            hardware.playWorkoutEndAlert()
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             hardware.stopStepCounter()
@@ -71,195 +120,228 @@ fun WorkoutScreen(
         }
     }
 
-    LaunchedEffect(isRunning) {
-        if (isRunning && timeLeft > 0) {
-            while (timeLeft > 0 && isRunning) {
-                delay(1000L)
-                timeLeft--
-            }
-            if (timeLeft == 0) {
-                hardware.playWorkoutEndAlert()
-                isRunning = false
-            }
-        }
+    val exercisesList = remember(currentRoutine) {
+        currentRoutine?.exercises?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
     }
+    val visibleExercises = exercisesList.take(3)
+    val remainingExercises = exercisesList.size - 3
 
     Scaffold(
         containerColor = gymBlack,
+        // --- CONFIGURACIÓN SNACKBAR PARA ALERTAS DE RED ---
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    containerColor = gymCardGray,
+                    contentColor = gymWhite,
+                    actionColor = gymAccent,
+                    snackbarData = data,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.FitnessCenter,
-                            contentDescription = null,
-                            tint = gymAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.FitnessCenter, null, tint = gymAccent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            "MODO ENTRENAMIENTO",
+                            "ENTRENAMIENTO",
                             fontWeight = FontWeight.ExtraBold,
                             color = gymWhite,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             letterSpacing = 1.sp
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = gymDarkGray,
-                    scrolledContainerColor = gymBlack
-                )
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Regresar",
+                            tint = gymWhite
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = gymDarkGray)
             )
         }
     ) { padding ->
-        // Scroll state para poder hacer scroll si es necesario
         val scrollState = rememberScrollState()
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(scrollState) // AÑADIDO: Scroll vertical
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .verticalScroll(scrollState)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Imagen de la rutina (más compacta)
+            // 1. Imagen más compacta
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
-                shape = RoundedCornerShape(24.dp),
+                    .height(140.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = gymCardGray),
                 border = BorderStroke(1.dp, gymBorderGray)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (!currentRoutine?.imageUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(currentRoutine?.imageUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Imagen Ejercicio",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                    )
-                                )
-                        )
-                        Text(
-                            text = currentRoutine?.name?.uppercase() ?: "",
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp),
-                            color = gymWhite,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
-                            letterSpacing = 0.5.sp
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.FitnessCenter,
-                                    contentDescription = null,
-                                    tint = gymBorderGray,
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    "SIN IMAGEN",
-                                    color = gymLightGray,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(currentRoutine?.imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
+                    )
+                    Text(
+                        currentRoutine?.name?.uppercase() ?: "",
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(12.dp),
+                        color = gymWhite,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Timer más compacto
+            // 2. Timer Compacto
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = gymCardGray,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 border = BorderStroke(1.dp, gymBorderGray)
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = gymAccent,
-                            modifier = Modifier.size(16.dp)
+                            Icons.Default.FitnessCenter,
+                            null,
+                            tint = gymSuccess,
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
-                            "TIEMPO DE DESCANSO",
-                            color = gymAccent,
+                            "SERIES: $completedSets",
+                            color = gymSuccess,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     Text(
                         text = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60),
                         style = MaterialTheme.typography.displayLarge.copy(
                             fontWeight = FontWeight.Black,
-                            fontSize = 56.sp,
+                            fontSize = 48.sp,
                             letterSpacing = 2.sp
                         ),
-                        color = when {
-                            timeLeft < 10 -> gymWarning
-                            timeLeft < 30 -> gymAccent
-                            else -> gymWhite
-                        }
+                        color = if (isRunning) gymAccent else gymWhite
+                    )
+
+                    Text(
+                        text = if (isRunning) "DESCANSO" else "PREPARACIÓN",
+                        color = gymLightGray,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Data boxes más compactos (pasos y estado)
+            // 3. Ejercicios
+            Text(
+                "EJERCICIOS",
+                color = gymAccent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            visibleExercises.forEach { exercise ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    color = gymCardGray,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, gymBorderGray)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            null,
+                            tint = if (completedSets > 0) gymSuccess else gymBorderGray,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            exercise,
+                            color = gymWhite,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            if (remainingExercises > 0) {
+                Text(
+                    "+ $remainingExercises ejercicios más",
+                    color = gymLightGray,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 4. Data boxes
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (currentRoutine?.isStepCounterActive == true) {
-                    DataBox(
-                        label = "PASOS",
+                    CompactDataBox(
                         value = "$steps",
                         icon = Icons.Default.DirectionsRun,
                         color = gymAccent,
                         modifier = Modifier.weight(1f)
                     )
                 }
-                DataBox(
-                    label = "ESTADO",
+                CompactDataBox(
                     value = "LIVE",
                     icon = Icons.Default.FiberManualRecord,
                     color = gymSuccess,
@@ -267,28 +349,26 @@ fun WorkoutScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Botones más compactos y optimizados
+            // 5. Botón principal compacto
             Button(
                 onClick = {
-                    if (isRunning) isRunning = false
-                    else {
+                    if (!isRunning) {
                         hardware.stopAlarm()
-                        isRunning = true
+                        timerService?.startTimer(currentRoutine?.restTime ?: 90)
+                        completedSets++
+                    } else {
+                        timerService?.stopTimer()
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp), // Altura reducida
-                shape = RoundedCornerShape(16.dp),
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isRunning) gymBorderGray else gymAccent,
-                    contentColor = if (isRunning) gymLightGray else Color.Black
-                ),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 0.dp,
-                    pressedElevation = 2.dp
+                    contentColor = if (isRunning) gymWhite else Color.Black
                 )
             ) {
                 Row(
@@ -296,49 +376,13 @@ fun WorkoutScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
+                        if (isRunning) Icons.Default.SkipNext else Icons.Default.Timer,
+                        null,
                         modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        if (isRunning) "PAUSAR DESCANSO" else "INICIAR DESCANSO",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Botón finalizar más compacto
-            OutlinedButton(
-                onClick = {
-                    hardware.stopAlarm()
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = gymWarning
-                ),
-                border = BorderStroke(1.dp, gymWarning.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "FINALIZAR RUTINA",
+                        if (isRunning) "SALTAR" else "SERIE COMPLETADA",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         letterSpacing = 0.5.sp
@@ -346,62 +390,83 @@ fun WorkoutScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Frase motivacional pequeña
+            // 6. Botón finalizar compacto
+            OutlinedButton(
+                onClick = {
+                    currentRoutine?.let { routine ->
+                        workoutViewModel.finishWorkout(
+                            routineId = routine.id,
+                            routineName = routine.name,
+                            steps = steps
+                        )
+                    }
+                    timerService?.stopTimer()
+                    hardware.stopAlarm()
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = gymWarning),
+                border = BorderStroke(1.dp, gymWarning.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("FINALIZAR", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
             Text(
                 text = "💪 " + when {
-                    isRunning && timeLeft > 0 -> "DESCANSA Y RECUPERA"
-                    !isRunning && timeLeft > 0 -> "PREPARADO PARA CONTINUAR"
-                    timeLeft == 0 -> "¡DESCANSO COMPLETADO!"
-                    else -> "TÚ PUEDES, NO TE RINDAS"
+                    isRunning && timeLeft > 0 -> "DESCANSA"
+                    !isRunning && timeLeft > 0 -> "PREPARADO"
+                    timeLeft == 0 -> "¡COMPLETADO!"
+                    else -> "TÚ PUEDES"
                 } + " 💪",
-                color = gymLightGray.copy(alpha = 0.6f),
+                color = gymLightGray.copy(alpha = 0.5f),
                 fontSize = 9.sp,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(bottom = 16.dp)
+                letterSpacing = 0.5.sp
             )
+
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-fun DataBox(
-    label: String,
+private fun CompactDataBox(
     value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     color: Color,
-    modifier: Modifier
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.height(56.dp),
         color = Color(0xFF121212),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, Color(0xFF252525))
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                label,
-                color = Color.Gray,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.5.sp
-            )
+            Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 value,
                 color = Color.White,
                 fontWeight = FontWeight.Black,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 letterSpacing = 0.5.sp
             )
         }

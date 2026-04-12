@@ -123,6 +123,15 @@ fun CoachHomeScreen(navController: NavController) {
                     onClick = { navController.navigate("profile") }
                 )
             }
+            item {
+                CoachMenuCard(
+                    title = "AVANCES",
+                    subtitle = "Ver alumnos",
+                    icon = Icons.Default.BarChart,
+                    color = Color(0xFFFFB300), // Ámbar
+                    onClick = { navController.navigate("students_progress") } // Asegúrate de añadir esta ruta a tu NavHost
+                )
+            }
 
             // --- BOTÓN SALIR ---
             item {
